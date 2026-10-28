@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Holiday Island - The Great Packing Quest</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- FontAwesome for Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- Canvas Confetti Library -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <!-- Google Fonts: Fredoka & Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Three.js Library -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: 'Inter', sans-serif;
+      user-select: none;
+      background-color: #0f172a;
+    }
+    .font-heading {
+      font-family: 'Fredoka', cursive, sans-serif;
+    }
+    #canvas-container {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      cursor: grab;
+    }
+    #canvas-container:active {
+      cursor: grabbing;
+    }
+    /* Pulsing glow animation for prompts */
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(1); opacity: 0.9; box-shadow: 0 0 15px rgba(234, 179, 8, 0.6); }
+      50% { transform: scale(1.05); opacity: 1; box-shadow: 0 0 30px rgba(234, 179, 8, 0.9); }
+    }
+    .pulse-glow {
+      animation: pulseGlow 1.8s infinite ease-in-out;
+    }
+    /* Fire Caution Pulse */
+    @keyframes firePulse {
+      0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(239, 68, 68, 0.7); }
+      50% { transform: scale(1.08); box-shadow: 0 0 35px rgba(239, 68, 68, 0.95); }
+    }
+    .fire-warning-glow {
+      animation: firePulse 1.2s infinite ease-in-out;
+    }
+    /* On-screen joystick/touch controls */
+    .touch-btn {
+      touch-action: manipulation;
+    }
+  </style>
+</head>
+<body class="relative text-white overflow-hidden">
+
+  <!-- 3D Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- Water Submersion / Drowning Overlay Tint -->
+  <div id="water-overlay" class="pointer-events-none fixed inset-0 bg-cyan-900/0 z-10 transition-colors duration-300"></div>
+
+  <!-- Game HUD Header Bar -->
+  <div class="absolute top-4 left-4 right-4 flex justify-between items-center z-20 pointer-events-none">
+    
+    <!-- Title Badge -->
+    <div class="bg-slate-900/90 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-amber-500/30 shadow-xl flex items-center gap-3 pointer-events-auto">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-yellow-400 flex items-center justify-center text-slate-950 font-bold text-xl shadow">
+        <i class="fa-solid fa-plane-departure"></i>
+      </div>
+      <div>
+        <h1 class="font-heading text-base md:text-lg font-bold text-amber-400 leading-tight">Holiday Island</h1>
+        <p class="text-xs text-slate-300">Year 5 • Unit 8: Going Away</p>
+      </div>
+    </div>
+
+    <!-- Center HUD: Camera Scan & Controls Helper -->
+    <div class="flex items-center gap-2 pointer-events-auto">
+      <button id="btn-scan" class="bg-indigo-600/90 hover:bg-indigo-500 text-white font-semibold text-xs md:text-sm px-4 py-2.5 rounded-xl border border-indigo-400/40 shadow-lg backdrop-blur-md transition-all flex items-center gap-2 active:scale-95">
+        <i class="fa-solid fa-eye text-indigo-300"></i>
+        <span>Scan Island (360°)</span>
+      </button>
+
+      <button id="btn-controls" class="bg-slate-800/90 hover:bg-slate-700 text-slate-200 font-semibold text-xs md:text-sm px-3.5 py-2.5 rounded-xl border border-slate-600 shadow-lg backdrop-blur-md transition-all flex items-center gap-2 active:scale-95">
+        <i class="fa-solid fa-gamepad text-amber-400"></i>
+        <span>Controls</span>
+      </button>
+    </div>
+
+    <!-- HUD Stats: Progress & Score -->
+    <div class="flex items-center gap-3 pointer-events-auto">
+      <div class="bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-2xl border border-slate-700 shadow-xl flex items-center gap-4">
+        <!-- Progress Items -->
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-suitcase text-amber-400 text-lg"></i>
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Packed</div>
+            <div id="hud-progress" class="font-heading text-sm md:text-base text-white font-bold">0 / 5</div>
+          </div>
+        </div>
+        <div class="h-8 w-px bg-slate-700"></div>
+        <!-- Score -->
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-star text-yellow-400 text-lg"></i>
+          <div>
+            <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Points</div>
+            <div id="hud-score" class="font-heading text-sm md:text-base text-yellow-400 font-bold">0</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Inventory Icons Drawer (Bottom Left) -->
+  <div class="absolute bottom-6 left-6 z-20 pointer-events-none hidden md:block">
+    <div class="bg-slate-900/90 backdrop-blur-md p-3 rounded-2xl border border-slate-700 shadow-2xl">
+      <div class="text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+        <i class="fa-solid fa-list-check"></i> Rucksack Checklist
+      </div>
+      <div id="inventory-list" class="flex gap-2.5">
+        <!-- Dyn. generated items -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Proximity Interaction Prompt Banner -->
+  <div id="interaction-prompt" class="absolute bottom-28 left-1/2 -translate-x-1/2 z-20 pointer-events-auto hidden">
+    <button id="interact-btn" class="pulse-glow bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-900 font-heading font-bold text-lg md:text-xl px-8 py-3.5 rounded-full shadow-2xl flex items-center gap-3 hover:scale-105 active:scale-95 transition-transform border-2 border-white">
+      <span class="bg-slate-900 text-amber-400 w-8 h-8 rounded-full flex items-center justify-center text-sm font-extrabold shadow">E</span>
+      <span id="interact-label">Open Treasure Chest</span>
+    </button>
+  </div>
+
+  <!-- Campfire Caution Warning Banner -->
+  <div id="fire-caution-prompt" class="absolute top-24 left-1/2 -translate-x-1/2 z-20 pointer-events-none hidden">
+    <div class="fire-warning-glow bg-gradient-to-r from-red-600 via-orange-600 to-red-600 text-white font-heading font-bold text-base md:text-lg px-6 py-2.5 rounded-full shadow-2xl flex items-center gap-3 border-2 border-yellow-300">
+      <i class="fa-solid fa-triangle-exclamation text-yellow-300 text-xl animate-bounce"></i>
+      <span>CAUTION! Too Close to the Campfire!</span>
+    </div>
+  </div>
+
+  <!-- Controls Guide Modal / Overlay -->
+  <div id="controls-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md hidden pointer-events-auto">
+    <div class="bg-slate-900 border border-slate-700 rounded-3xl p-6 max-w-md w-full shadow-2xl relative">
+      <button id="close-controls-btn" class="absolute top-4 right-4 text-slate-400 hover:text-white text-xl p-2">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+      
+      <div class="flex items-center gap-3 mb-5">
+        <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-xl">
+          <i class="fa-solid fa-gamepad"></i>
+        </div>
+        <div>
+          <h3 class="font-heading text-xl font-bold text-white">How to Play</h3>
+          <p class="text-xs text-slate-400">Controls & Exploration Guide</p>
+        </div>
+      </div>
+
+      <div class="space-y-3">
+        <div class="flex items-center justify-between bg-slate-800/70 p-3 rounded-xl border border-slate-700">
+          <span class="text-sm font-semibold text-slate-200">Move Explorer</span>
+          <div class="flex items-center gap-1.5 text-xs font-mono bg-slate-900 px-2.5 py-1 rounded-lg text-amber-400 border border-slate-700">
+            <span>W</span> <span>A</span> <span>S</span> <span>D</span> or Arrows
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between bg-slate-800/70 p-3 rounded-xl border border-slate-700">
+          <span class="text-sm font-semibold text-slate-200">Rotate Camera (360°)</span>
+          <div class="flex items-center gap-2 text-xs font-semibold text-amber-300">
+            <i class="fa-solid fa-hand-pointer"></i> Drag Left / Right / Up / Down or Mouse Wheel Zoom
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between bg-slate-800/70 p-3 rounded-xl border border-slate-700">
+          <span class="text-sm font-semibold text-slate-200">Interact / Open Chest</span>
+          <div class="flex items-center gap-1.5 text-xs font-mono bg-slate-900 px-3 py-1 rounded-lg text-amber-400 border border-slate-700">
+            Key <span class="font-bold">E</span>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between bg-slate-800/70 p-3 rounded-xl border border-slate-700">
+          <span class="text-sm font-semibold text-slate-200">Scan Hidden Items</span>
+          <div class="flex items-center gap-1 text-xs font-semibold text-indigo-300">
+            Click <span class="bg-indigo-600 px-2 py-0.5 rounded text-white font-bold">Scan Island</span>
+          </div>
+        </div>
+      </div>
+
+      <button id="got-it-btn" class="mt-6 w-full py-3 bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-bold rounded-xl shadow-lg hover:brightness-110 active:scale-95 transition-all">
+        Got It! Let's Play
+      </button>
+    </div>
+  </div>
+
+  <!-- On-Screen Mobile Touch Joystick / D-Pad (Bottom Right) -->
+  <div class="absolute bottom-6 right-6 z-20 flex flex-col items-center gap-2 md:hidden pointer-events-auto opacity-80 hover:opacity-100 transition-opacity">
+    <button id="btn-up" class="touch-btn w-14 h-14 bg-slate-800/90 text-amber-400 text-2xl font-bold rounded-2xl border border-slate-600 flex items-center justify-center active:bg-amber-500 active:text-slate-950 shadow-xl">▲</button>
+    <div class="flex gap-2">
+      <button id="btn-left" class="touch-btn w-14 h-14 bg-slate-800/90 text-amber-400 text-2xl font-bold rounded-2xl border border-slate-600 flex items-center justify-center active:bg-amber-500 active:text-slate-950 shadow-xl">◀</button>
+      <button id="btn-down" class="touch-btn w-14 h-14 bg-slate-800/90 text-amber-400 text-2xl font-bold rounded-2xl border border-slate-600 flex items-center justify-center active:bg-amber-500 active:text-slate-950 shadow-xl">▼</button>
+      <button id="btn-right" class="touch-btn w-14 h-14 bg-slate-800/90 text-amber-400 text-2xl font-bold rounded-2xl border border-slate-600 flex items-center justify-center active:bg-amber-500 active:text-slate-950 shadow-xl">▶</button>
+    </div>
+  </div>
+
+  <!-- Quiz & Confirmation Popup Modal -->
+  <div id="quiz-modal" class="fixed inset-0 z-40 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md hidden pointer-events-auto">
+    <div class="bg-slate-900 border-2 border-amber-500/50 rounded-3xl p-6 md:p-8 max-w-lg w-full shadow-2xl relative transform transition-all scale-100">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between mb-4 border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-3">
+          <span id="quiz-item-icon" class="text-3xl text-amber-400">🎒</span>
+          <div>
+            <span class="text-[10px] uppercase font-bold text-amber-400 tracking-wider">Unit 8 Packing Challenge</span>
+            <h2 id="quiz-item-title" class="font-heading text-xl font-bold text-white">Found: Rucksack</h2>
+          </div>
+        </div>
+        <span class="bg-amber-500/10 text-amber-400 border border-amber-500/30 text-xs font-semibold px-3 py-1 rounded-full">+100 Pts</span>
+      </div>
+
+      <!-- Question View -->
+      <div id="quiz-question-view">
+        <p id="quiz-question-text" class="text-slate-200 text-base md:text-lg mb-6 leading-relaxed font-medium">
+          Loading question...
+        </p>
+
+        <!-- Dynamic Answer Buttons -->
+        <div id="quiz-options-container" class="space-y-3 mb-6">
+          <!-- Options generated dynamically -->
+        </div>
+      </div>
+
+      <!-- Confirmation Step View (Are you sure?) -->
+      <div id="quiz-confirm-view" class="hidden text-center py-4">
+        <div class="w-16 h-16 bg-amber-500/20 text-amber-400 rounded-full flex items-center justify-center text-3xl mx-auto mb-3 animate-bounce">
+          <i class="fa-solid fa-circle-question"></i>
+        </div>
+        <h3 class="font-heading text-xl font-bold text-white mb-2">Are you sure with your answer?</h3>
+        <p class="text-slate-300 text-sm mb-6 bg-slate-800/70 p-3 rounded-xl border border-slate-700 italic" id="confirm-selected-text">
+          Selected answer option...
+        </p>
+        <div class="grid grid-cols-2 gap-3">
+          <button id="btn-confirm-no" class="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl border border-slate-600 transition-all active:scale-95">
+            <i class="fa-solid fa-pen-to-square mr-1.5"></i> Change
+          </button>
+          <button id="btn-confirm-yes" class="py-3 px-4 bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-bold rounded-xl shadow-lg hover:brightness-110 transition-all active:scale-95">
+            <i class="fa-solid fa-check mr-1.5"></i> Yes, Submit!
+          </button>
+        </div>
+      </div>
+
+      <!-- Result Feedback Alert Box -->
+      <div id="quiz-feedback" class="hidden p-4 rounded-xl text-center font-bold text-sm mb-4"></div>
+    </div>
+  </div>
+
+  <!-- Victory Victory Overlay Modal -->
+  <div id="victory-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/90 backdrop-blur-lg hidden pointer-events-auto">
+    <div class="bg-slate-900 border-2 border-yellow-400/80 rounded-3xl p-8 max-w-md w-full text-center shadow-2xl relative overflow-hidden">
+      <!-- Glow effect -->
+      <div class="absolute -top-24 -left-24 w-48 h-48 bg-amber-500/20 rounded-full blur-3xl"></div>
+      <div class="absolute -bottom-24 -right-24 w-48 h-48 bg-yellow-500/20 rounded-full blur-3xl"></div>
+
+      <div class="w-20 h-20 bg-gradient-to-tr from-yellow-400 to-amber-500 rounded-3xl text-slate-950 text-4xl flex items-center justify-center mx-auto mb-4 shadow-xl font-bold animate-bounce">
+        🏆
+      </div>
+
+      <h2 class="font-heading text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-200 mb-1">
+        Quest Completed!
+      </h2>
+      <p class="text-amber-400 font-semibold text-sm mb-6">Master Holiday Explorer Badge Earned!</p>
+
+      <div class="bg-slate-800/80 rounded-2xl p-4 border border-slate-700 space-y-3 mb-6 text-left">
+        <div class="flex justify-between items-center text-sm">
+          <span class="text-slate-400">Total Items Packed:</span>
+          <span class="font-bold text-emerald-400">5 / 5 Items</span>
+        </div>
+        <div class="flex justify-between items-center text-sm">
+          <span class="text-slate-400">Final Score:</span>
+          <span id="victory-score" class="font-bold text-yellow-400 text-base">500 Pts</span>
+        </div>
+        <div class="flex justify-between items-center text-sm">
+          <span class="text-slate-400">Unit 8 Mastery:</span>
+          <span class="font-bold text-indigo-300">100% (Grade A+)</span>
+        </div>
+      </div>
+
+      <button id="btn-restart" class="w-full py-4 bg-gradient-to-r from-amber-500 to-yellow-400 text-slate-950 font-heading font-bold text-lg rounded-2xl shadow-xl hover:brightness-110 active:scale-95 transition-all">
+        Play Again <i class="fa-solid fa-rotate-right ml-2"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Build World & Character -->
+  <script>
+    /* =========================================================================
+       1. GAME DATA & QUESTION BANK (Year 5 English Unit 8: Going Away)
+       ========================================================================= */
+    const ITEMS_DATA = [
+      {
+        id: 'rucksack',
+        name: 'Rucksack',
+        icon: '🎒',
+        meshColor: 0xd97706,
+        pos: { x: -28, y: 0.35, z: 24 }, // Hidden far edge behind trees
+        question: "Before going on a camping trip, you put all your clothes and equipment inside a ________.",
+        options: [
+          "A) rucksack",
+          "B) phrasebook",
+          "C) sun cream",
+          "D) torch"
+        ],
+        correct: 0
+      },
+      {
+        id: 'tent',
+        name: 'Camping Tent',
+        icon: '⛺',
+        meshColor: 0xd97706,
+        pos: { x: 30, y: 0.35, z: -25 }, // Tucked deep right forest corner
+        question: "Look at the dark clouds! It ________ rainy later, so we need to set up our shelter.",
+        options: [
+          "A) is going to",
+          "B) will be",
+          "C) won't",
+          "D) are"
+        ],
+        correct: 1
+      },
+      {
+        id: 'torch',
+        name: 'Flash Torch',
+        icon: '🔦',
+        meshColor: 0xd97706,
+        pos: { x: 28, y: 0.35, z: 26 }, // Hidden behind southern rock outcrop
+        question: "It gets very dark at night inside the forest. You need a ________ to see in the night.",
+        options: [
+          "A) waterproofs",
+          "B) sleeping bag",
+          "C) torch",
+          "D) insect spray"
+        ],
+        correct: 2
+      },
+      {
+        id: 'suncream',
+        name: 'Sun Cream',
+        icon: '🧴',
+        meshColor: 0xd97706,
+        pos: { x: -30, y: 0.35, z: -22 }, // Tucked far left top corner
+        question: "Tomorrow is going to be hot and sunny! What are you going to wear to protect your skin?",
+        options: [
+          "A) I am going to wear sun cream.",
+          "B) I will wear a heavy coat.",
+          "C) I won't bring any water.",
+          "D) I am going to use phrasebook."
+        ],
+        correct: 0
+      },
+      {
+        id: 'waterbottle',
+        name: 'Water Bottle',
+        icon: '💧',
+        meshColor: 0xd97706,
+        pos: { x: 4, y: 0.35, z: 32 }, // Hidden near outer southern shore
+        question: "We are going to walk up the mountain for 3 hours. We ________ bring plenty of water.",
+        options: [
+          "A) won't",
+          "B) will",
+          "C) isn't",
+          "D) aren't"
+        ],
+        correct: 1
+      }
+    ];
+
+    /* =========================================================================
+       2. GLOBAL STATE MANAGEMENT
+       ========================================================================= */
+    const state = {
+      score: 0,
+      collectedItems: new Set(),
+      timerSeconds: 0,
+      timerInterval: null,
+      activeItem: null,
+      selectedOptionIndex: null,
+      attempts: 0,
+      correctAnswersCount: 0,
+      playerPos: new THREE.Vector3(0, 0, 0),
+      isModalOpen: false,
+      gameEnded: false,
+      isSweepingCamera: false,
+      cameraSweepAngle: 0,
+      // Drowning & Respawn State
+      isRespawning: false,
+      respawnTarget: new THREE.Vector3(0, 2.0, 8),
+      wadeDepth: 0, // Track current depth of immersion in water (0 to 1)
+      activePondCenter: null,
+      // Full 360 Camera Orbit Controls State
+      cameraAngle: 0,
+      cameraPitch: 0.45,
+      cameraDistance: 16,
+      isDraggingCamera: false,
+      previousMouseX: 0,
+      previousMouseY: 0
+    };
+
+    /* Store pond shapes for progressive depth calculation */
+    const POND_DEFINITIONS = [
+      { center: new THREE.Vector3(-12, 0, 6), radius: 5.2 }, // Inland Pond Left
+      { center: new THREE.Vector3(14, 0, -10), radius: 6.5 }   // Inland Pond Right
+    ];
+
+    /* Key Input State */
+    const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowLeft: false, ArrowDown: false, ArrowRight: false };
+
+    /* Three.js Core Variables */
+    let scene, camera, renderer;
+    let player, playerBody, playerHead, leftArm, rightArm, leftLeg, rightLeg;
+    const itemMeshes = [];
+
+    /* =========================================================================
+       3. THREE.JS SCENE SETUP & GRAPHICS
+       ========================================================================= */
+    function init3D() {
+      const container = document.getElementById('canvas-container');
+
+      // Create Scene
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x38bdf8); // Bright blue summer sky
+      scene.fog = new THREE.FogExp2(0x38bdf8, 0.008);
+
+      // Create Camera
+      camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+
+      // Create Renderer
+      renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      container.appendChild(renderer.domElement);
+
+      // Lighting Setup
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+      scene.add(ambientLight);
+
+      const sunLight = new THREE.DirectionalLight(0xfffbeb, 1.2);
+      sunLight.position.set(40, 60, 20);
+      sunLight.castShadow = true;
+      sunLight.shadow.mapSize.width = 2048;
+      sunLight.shadow.mapSize.height = 2048;
+      sunLight.shadow.camera.near = 0.5;
+      sunLight.shadow.camera.far = 150;
+      const d = 45;
+      sunLight.shadow.camera.left = -d;
+      sunLight.shadow.camera.right = d;
+      sunLight.shadow.camera.top = d;
+      sunLight.shadow.camera.bottom = -d;
+      scene.add(sunLight);
+
+      // Build World & Character
+      createIslandTerrain();
+      createCampsiteTentsAndBonfire();
+      createTreesAndRocks();
+      createHumanPlayerCharacter();
+      createSubtleTreasureChests();
+
+      // Set initial camera target
+      player.position.set(0, 0.9, 8);
+      camera.position.set(0, 8, 22);
+      camera.lookAt(player.position);
+
+      // Window Resize Handler
+      window.addEventListener('resize', onWindowResize);
+    }
+
+    /* Create Taller Human Player Character with Complete Hat, Hands & Feet */
+    function createHumanPlayerCharacter() {
+      player = new THREE.Group();
+
+      // Material Palette
+      const skinMat = new THREE.MeshStandardMaterial({ color: 0xffdbac, roughness: 0.6 }); // Skin
+      const shirtMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.5 }); // Blue Shirt
+      const shortsMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.7 }); // Dark Shorts
+      const bootMat = new THREE.MeshStandardMaterial({ color: 0x451a03, roughness: 0.8 }); // Brown Boots
+      const hatMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.6 }); // Safari Hat
+      const hatBandMat = new THREE.MeshStandardMaterial({ color: 0x1e293b }); // Hat Ribbon Band
+
+      // 1. Torso / Shirt (Taller proportion)
+      const bodyGeo = new THREE.BoxGeometry(0.85, 1.25, 0.5);
+      playerBody = new THREE.Mesh(bodyGeo, shirtMat);
+      playerBody.position.y = 1.35;
+      playerBody.castShadow = true;
+      player.add(playerBody);
+
+      // 2. Head & Face
+      const headGeo = new THREE.SphereGeometry(0.38, 16, 16);
+      playerHead = new THREE.Mesh(headGeo, skinMat);
+      playerHead.position.set(0, 2.15, 0);
+      playerHead.castShadow = true;
+      player.add(playerHead);
+
+      // Eyes
+      const eyeGeo = new THREE.SphereGeometry(0.06, 8, 8);
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+      const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+      leftEye.position.set(-0.13, 2.2, 0.33);
+      const rightEye = leftEye.clone();
+      rightEye.position.set(0.13, 2.2, 0.33);
+      player.add(leftEye);
+      player.add(rightEye);
+
+      // 3. Complete Explorer Top Hat (Brim + Full Crown + Ribbon Band)
+      const hatBrimGeo = new THREE.CylinderGeometry(0.75, 0.75, 0.06, 16);
+      const hatBrim = new THREE.Mesh(hatBrimGeo, hatMat);
+      hatBrim.position.set(0, 2.45, 0);
+      player.add(hatBrim);
+
+      const hatCrownGeo = new THREE.CylinderGeometry(0.42, 0.45, 0.6, 16);
+      const hatCrown = new THREE.Mesh(hatCrownGeo, hatMat);
+      hatCrown.position.set(0, 2.75, 0);
+      player.add(hatCrown);
+
+      const hatBandGeo = new THREE.CylinderGeometry(0.46, 0.46, 0.12, 16);
+      const hatBand = new THREE.Mesh(hatBandGeo, hatBandMat);
+      hatBand.position.set(0, 2.52, 0);
+      player.add(hatBand);
+
+      // 4. Arms & Hands
+      const armGeo = new THREE.CylinderGeometry(0.12, 0.11, 0.75);
+      const handGeo = new THREE.SphereGeometry(0.13, 10, 10);
+
+      // Left Arm
+      leftArm = new THREE.Group();
+      const lArmMesh = new THREE.Mesh(armGeo, shirtMat);
+      lArmMesh.position.y = -0.3;
+      lArmMesh.castShadow = true;
+      leftArm.add(lArmMesh);
+      const lHandMesh = new THREE.Mesh(handGeo, skinMat);
+      lHandMesh.position.y = -0.7;
+      leftArm.add(lHandMesh);
+      leftArm.position.set(-0.55, 1.85, 0);
+      player.add(leftArm);
+
+      // Right Arm
+      rightArm = new THREE.Group();
+      const rArmMesh = new THREE.Mesh(armGeo, shirtMat);
+      rArmMesh.position.y = -0.3;
+      rArmMesh.castShadow = true;
+      rightArm.add(rArmMesh);
+      const rHandMesh = new THREE.Mesh(handGeo, skinMat);
+      rHandMesh.position.y = -0.7;
+      rightArm.add(rHandMesh);
+      rightArm.position.set(0.55, 1.85, 0);
+      player.add(rightArm);
+
+      // 5. Legs & Boots (Feet)
+      const legGeo = new THREE.CylinderGeometry(0.14, 0.13, 0.85);
+      const bootGeo = new THREE.BoxGeometry(0.28, 0.3, 0.5);
+
+      // Left Leg
+      leftLeg = new THREE.Group();
+      const lLegMesh = new THREE.Mesh(legGeo, shortsMat);
+      lLegMesh.position.y = -0.35;
+      lLegMesh.castShadow = true;
+      leftLeg.add(lLegMesh);
+      const lBootMesh = new THREE.Mesh(bootGeo, bootMat);
+      lBootMesh.position.set(0, -0.75, 0.08);
+      lBootMesh.castShadow = true;
+      leftLeg.add(lBootMesh);
+      leftLeg.position.set(-0.24, 0.75, 0);
+      player.add(leftLeg);
+
+      // Right Leg
+      rightLeg = new THREE.Group();
+      const rLegMesh = new THREE.Mesh(legGeo, shortsMat);
+      rLegMesh.position.y = -0.35;
+      rLegMesh.castShadow = true;
+      rightLeg.add(rLegMesh);
+      const rBootMesh = new THREE.Mesh(bootGeo, bootMat);
+      rBootMesh.position.set(0, -0.75, 0.08);
+      rBootMesh.castShadow = true;
+      rightLeg.add(rBootMesh);
+      rightLeg.position.set(0.24, 0.75, 0);
+      player.add(rightLeg);
+
+      scene.add(player);
+    }
+
+    /* Handle Character Movement, Animations & Camera Smooth Sync */
+    function updatePlayerAndCamera(delta) {
+      if (state.isRespawning || state.gameEnded || state.isModalOpen) return;
+
+      // Calculate move direction vector from input keys
+      let moveZ = 0;
+      let moveX = 0;
+
+      if (keys.w || keys.ArrowUp) moveZ -= 1;
+      if (keys.s || keys.ArrowDown) moveZ += 1;
+      if (keys.a || keys.ArrowLeft) moveX -= 1;
+      if (keys.d || keys.ArrowRight) moveX += 1;
+
+      const isMoving = moveX !== 0 || moveZ !== 0;
+
+      if (isMoving) {
+        // Slow down movement speed if wading in deep water
+        const speed = (6.5 * (1.0 - state.wadeDepth * 0.55)) * delta;
+        
+        // Calculate camera orientation angle
+        const camAngle = state.cameraAngle;
+
+        // Transform movement relative to camera angle
+        const dir = new THREE.Vector3(moveX, 0, moveZ).normalize();
+        const rotatedX = dir.x * Math.cos(camAngle) + dir.z * Math.sin(camAngle);
+        const rotatedZ = -dir.x * Math.sin(camAngle) + dir.z * Math.cos(camAngle);
+
+        player.position.x += rotatedX * speed;
+        player.position.z += rotatedZ * speed;
+
+        // Rotate character mesh to face movement direction
+        const targetRotation = Math.atan2(rotatedX, rotatedZ);
+        player.rotation.y = targetRotation;
+
+        // Walking limb swing animation
+        const swingTime = Date.now() * 0.009;
+        leftArm.rotation.x = Math.sin(swingTime) * 0.7;
+        rightArm.rotation.x = -Math.sin(swingTime) * 0.7;
+        leftLeg.rotation.x = -Math.sin(swingTime) * 0.7;
+        rightLeg.rotation.x = Math.sin(swingTime) * 0.7;
+      } else {
+        // Idle pose
+        leftArm.rotation.x = 0;
+        rightArm.rotation.x = 0;
+        leftLeg.rotation.x = 0;
+        rightLeg.rotation.x = 0;
+      }
+
+      // Check proximity to campfire for caution banner
+      const distToCampfire = Math.hypot(player.position.x, player.position.z);
+      const firePrompt = document.getElementById('fire-caution-prompt');
+      if (distToCampfire < 2.5) {
+        firePrompt.classList.remove('hidden');
+      } else {
+        firePrompt.classList.add('hidden');
+      }
+
+      // Check dynamic immersion depth & drowning
+      checkPondImmersionAndDrowning();
+
+      // Check item interaction distance
+      checkItemProximity();
+
+      // Camera Position Updating (Orbiting Player seamlessly)
+      if (state.isSweepingCamera) {
+        state.cameraSweepAngle += delta * 0.8;
+        state.cameraAngle = state.cameraSweepAngle;
+        if (state.cameraSweepAngle >= Math.PI * 2) {
+          state.isSweepingCamera = false;
+          state.cameraSweepAngle = 0;
+        }
+      }
+
+      const camDist = state.cameraDistance;
+      const camY = Math.sin(state.cameraPitch) * camDist;
+      const camXZDist = Math.cos(state.cameraPitch) * camDist;
+
+      const targetCamX = player.position.x + Math.sin(state.cameraAngle) * camXZDist;
+      const targetCamY = player.position.y + camY + 2.0;
+      const targetCamZ = player.position.z + Math.cos(state.cameraAngle) * camXZDist;
+
+      // Smooth camera interpolation (avoid camera jitter)
+      camera.position.x += (targetCamX - camera.position.x) * 0.12;
+      camera.position.y += (targetCamY - camera.position.y) * 0.12;
+      camera.position.z += (targetCamZ - camera.position.z) * 0.12;
+
+      camera.lookAt(player.position.x, player.position.y + 1.6, player.position.z);
+    }
+
+    /* Setup Keyboard & Touch Joystick Controls */
+    function setupInputListeners() {
+      // Keyboard Keydown
+      window.addEventListener('keydown', (e) => {
+        if (keys.hasOwnProperty(e.key)) keys[e.key] = true;
+        if ((e.key === 'e' || e.key === 'E') && state.activeItem && !state.isModalOpen) {
+          triggerActiveItemInteraction();
+        }
+      });
+
+      // Keyboard Keyup
+      window.addEventListener('keyup', (e) => {
+        if (keys.hasOwnProperty(e.key)) keys[e.key] = false;
+      });
+
+      // Mouse Orbit Camera Controls (360 Real Motion View)
+      const container = document.getElementById('canvas-container');
+
+      container.addEventListener('mousedown', (e) => {
+        state.isDraggingCamera = true;
+        state.previousMouseX = e.clientX;
+        state.previousMouseY = e.clientY;
+      });
+
+      window.addEventListener('mouseup', () => {
+        state.isDraggingCamera = false;
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!state.isDraggingCamera) return;
+
+        const deltaX = e.clientX - state.previousMouseX;
+        const deltaY = e.clientY - state.previousMouseY;
+
+        state.cameraAngle += deltaX * 0.005;
+        state.cameraPitch = Math.max(0.1, Math.min(1.4, state.cameraPitch + deltaY * 0.005));
+
+        state.previousMouseX = e.clientX;
+        state.previousMouseY = e.clientY;
+      });
+
+      // Mouse Scroll Zoom
+      window.addEventListener('wheel', (e) => {
+        state.cameraDistance = Math.max(8, Math.min(30, state.cameraDistance + e.deltaY * 0.01));
+      });
+
+      // Mobile On-Screen D-Pad Touch Handlers
+      const bindTouchBtn = (id, keyName) => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        btn.addEventListener('touchstart', (e) => { e.preventDefault(); keys[keyName] = true; });
+        btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[keyName] = false; });
+      };
+
+      bindTouchBtn('btn-up', 'w');
+      bindTouchBtn('btn-down', 's');
+      bindTouchBtn('btn-left', 'a');
+      bindTouchBtn('btn-right', 'd');
+    }
+
+    /* Create Main Island & Surrounding Lake Water */
+    function createIslandTerrain() {
+      // Main Green Grass Island Ground (Elevated safely above water)
+      const islandGeo = new THREE.CylinderGeometry(40, 42, 3, 48);
+      const islandMat = new THREE.MeshStandardMaterial({ color: 0x4ade80, roughness: 0.8 }); // Fresh green grass
+      const island = new THREE.Mesh(islandGeo, islandMat);
+      island.position.y = -0.5;
+      island.receiveShadow = true;
+      scene.add(island);
+
+      // Beach Shore Sand Ring
+      const sandRingGeo = new THREE.RingGeometry(38, 48, 48);
+      const sandMat = new THREE.MeshStandardMaterial({ color: 0xfde047, side: THREE.DoubleSide, roughness: 0.9 });
+      const sandRing = new THREE.Mesh(sandRingGeo, sandMat);
+      sandRing.rotation.x = -Math.PI / 2;
+      sandRing.position.y = 0.02;
+      sandRing.receiveShadow = true;
+      scene.add(sandRing);
+
+      // Outer Lake Water Plane (Surrounding water boundary)
+      const waterGeo = new THREE.PlaneGeometry(300, 300);
+      const waterMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, transparent: true, opacity: 0.85, roughness: 0.1 });
+      const water = new THREE.Mesh(waterGeo, waterMat);
+      water.rotation.x = -Math.PI / 2;
+      water.position.y = -0.1; // Raised higher to make lake surrounding island prominently visible
+      scene.add(water);
+
+      // Build Inland Rounded Ponds (Lakes)
+      POND_DEFINITIONS.forEach(pond => {
+        // Outer Sand Rim
+        const rimGeo = new THREE.RingGeometry(pond.radius, pond.radius + 1.2, 32);
+        const rimMat = new THREE.MeshStandardMaterial({ color: 0xeab308, side: THREE.DoubleSide });
+        const rimMesh = new THREE.Mesh(rimGeo, rimMat);
+        rimMesh.rotation.x = -Math.PI / 2;
+        rimMesh.position.set(pond.center.x, 0.04, pond.center.z);
+        scene.add(rimMesh);
+
+        // Shallow Shore Water Layer
+        const shallowGeo = new THREE.CircleGeometry(pond.radius, 32);
+        const shallowMat = new THREE.MeshStandardMaterial({ 
+          color: 0x38bdf8, 
+          transparent: true, 
+          opacity: 0.85,
+          roughness: 0.1 
+        });
+        const shallowMesh = new THREE.Mesh(shallowGeo, shallowMat);
+        shallowMesh.rotation.x = -Math.PI / 2;
+        shallowMesh.position.set(pond.center.x, 0.05, pond.center.z);
+        scene.add(shallowMesh);
+
+        // Mid-depth Water Layer Ring
+        const midGeo = new THREE.CircleGeometry(pond.radius * 0.7, 32);
+        const midMat = new THREE.MeshStandardMaterial({ 
+          color: 0x0284c7, 
+          transparent: true, 
+          opacity: 0.9,
+          roughness: 0.1 
+        });
+        const midMesh = new THREE.Mesh(midGeo, midMat);
+        midMesh.rotation.x = -Math.PI / 2;
+        midMesh.position.set(pond.center.x, 0.03, pond.center.z);
+        scene.add(midMesh);
+
+        // Deep Water Trench Center Core
+        const deepGeo = new THREE.CircleGeometry(pond.radius * 0.4, 32);
+        const deepMat = new THREE.MeshStandardMaterial({ 
+          color: 0x0369a1, 
+          transparent: true, 
+          opacity: 0.95,
+          roughness: 0.1 
+        });
+        const deepMesh = new THREE.Mesh(deepGeo, deepMat);
+        deepMesh.rotation.x = -Math.PI / 2;
+        deepMesh.position.set(pond.center.x, 0.01, pond.center.z);
+        scene.add(deepMesh);
+      });
+    }
+
+    /* Scatter Environment Foliage & Rocks */
+    function createTreesAndRocks() {
+      const treePositions = [
+        { x: -22, z: 16 }, { x: 24, z: 18 }, { x: -25, z: -20 }, { x: 26, z: -22 },
+        { x: -14, z: -28 }, { x: 16, z: -30 }, { x: -32, z: 2 }, { x: 30, z: 5 }
+      ];
+
+      treePositions.forEach(p => {
+        const tree = new THREE.Group();
+        // Trunk
+        const trunkGeo = new THREE.CylinderGeometry(0.35, 0.5, 3);
+        const trunkMat = new THREE.MeshStandardMaterial({ color: 0x543826 });
+        const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+        trunk.position.y = 1.5;
+        trunk.castShadow = true;
+        tree.add(trunk);
+
+        // Foliage Leaves
+        const leavesGeo = new THREE.ConeGeometry(2.2, 4.5, 6);
+        const leavesMat = new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.6 });
+        const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+        leaves.position.y = 4.2;
+        leaves.castShadow = true;
+        tree.add(leaves);
+
+        tree.position.set(p.x, 1.0, p.z);
+        scene.add(tree);
+      });
+    }
+
+    /* Create Campsite Tents and Bonfire Flame (Enhanced Visibility) */
+    function createCampsiteTentsAndBonfire() {
+      // Main Center Bonfire Base & Logs
+      const fireGroup = new THREE.Group();
+      
+      const stoneRingGeo = new THREE.TorusGeometry(1.2, 0.25, 10, 20);
+      const stoneMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.9 });
+      const stoneRing = new THREE.Mesh(stoneRingGeo, stoneMat);
+      stoneRing.rotation.x = Math.PI / 2;
+      fireGroup.add(stoneRing);
+
+      // Wooden Logs
+      const logGeo = new THREE.CylinderGeometry(0.18, 0.18, 1.8, 8);
+      const logMat = new THREE.MeshStandardMaterial({ color: 0x451a03 });
+      for (let i = 0; i < 4; i++) {
+        const log = new THREE.Mesh(logGeo, logMat);
+        log.rotation.z = Math.PI / 3;
+        log.rotation.y = (i * Math.PI) / 4;
+        log.position.y = 0.3;
+        fireGroup.add(log);
+      }
+
+      // Fire Flame Cone (Vibrant, animated & tall)
+      const fireGeo = new THREE.ConeGeometry(0.8, 2.0, 10);
+      const fireMat = new THREE.MeshBasicMaterial({ color: 0xff4500 });
+      const fire = new THREE.Mesh(fireGeo, fireMat);
+      fire.position.y = 1.1;
+      fireGroup.add(fire);
+
+      // Inner Bright Yellow Flame
+      const innerFireGeo = new THREE.ConeGeometry(0.45, 1.3, 8);
+      const innerFireMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+      const innerFire = new THREE.Mesh(innerFireGeo, innerFireMat);
+      innerFire.position.y = 0.85;
+      fireGroup.add(innerFire);
+
+      // Fire Point Light Glow
+      const fireLight = new THREE.PointLight(0xff6600, 4.5, 20);
+      fireLight.position.set(0, 1.5, 0);
+      fireGroup.add(fireLight);
+
+      fireGroup.position.set(0, 0.1, 0);
+      scene.add(fireGroup);
+
+      // Decorative Campsite Tents positioned clearly around campsite
+      const tentPositions = [
+        { x: -6.5, z: -5, rot: 0.5, color: 0x0284c7 }, // Blue Tent
+        { x: 7.0, z: -4, rot: -0.6, color: 0xeab308 }, // Yellow Tent
+        { x: -7.5, z: 4, rot: 1.2, color: 0xef4444 }   // Red Tent
+      ];
+
+      tentPositions.forEach(t => {
+        const tentGroup = new THREE.Group();
+        
+        // Tent Body
+        const tentGeo = new THREE.ConeGeometry(3.0, 3.2, 4);
+        const tentMat = new THREE.MeshStandardMaterial({ color: t.color, roughness: 0.5 });
+        const tent = new THREE.Mesh(tentGeo, tentMat);
+        tent.position.y = 1.6;
+        tent.rotation.y = Math.PI / 4;
+        tent.castShadow = true;
+        tentGroup.add(tent);
+
+        // Tent Entrance Door Trim
+        const doorGeo = new THREE.BufferGeometry();
+        const doorMat = new THREE.MeshBasicMaterial({ color: 0x0f172a, side: THREE.DoubleSide });
+        const doorMesh = new THREE.Mesh(new THREE.ConeGeometry(1.2, 2.0, 3), doorMat);
+        doorMesh.position.set(0, 1.0, 1.2);
+        tentGroup.add(doorMesh);
+
+        tentGroup.position.set(t.x, 0.0, t.z);
+        tentGroup.rotation.y = t.rot;
+        scene.add(tentGroup);
+      });
+    }
+
+    /* Scatter Environment Foliage & Rocks */
+    /* Create Real Camping Items (Replacing Treasure Boxes) */
+    function createSubtleTreasureChests() {
+      ITEMS_DATA.forEach(itemData => {
+        const itemGroup = new THREE.Group();
+        itemGroup.userData = { id: itemData.id, data: itemData };
+
+        // Render specific 3D mesh model based on item ID
+        switch (itemData.id) {
+          case 'rucksack': {
+            // Rucksack Backpack Model
+            const packBodyGeo = new THREE.BoxGeometry(0.9, 1.2, 0.6);
+            const packMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.7 });
+            const packBody = new THREE.Mesh(packBodyGeo, packMat);
+            packBody.position.y = 0.6;
+            packBody.castShadow = true;
+            itemGroup.add(packBody);
+
+            // Front Pocket
+            const pocketGeo = new THREE.BoxGeometry(0.7, 0.5, 0.25);
+            const pocketMat = new THREE.MeshStandardMaterial({ color: 0xb45309 });
+            const pocket = new THREE.Mesh(pocketGeo, pocketMat);
+            pocket.position.set(0, 0.4, 0.35);
+            itemGroup.add(pocket);
+            break;
+          }
+          case 'tent': {
+            // Compact Rolled Camping Tent Model
+            const rollGeo = new THREE.CylinderGeometry(0.4, 0.4, 1.4, 16);
+            const rollMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.6 });
+            const roll = new THREE.Mesh(rollGeo, rollMat);
+            roll.rotation.z = Math.PI / 2;
+            roll.position.y = 0.4;
+            roll.castShadow = true;
+            itemGroup.add(roll);
+
+            // Straps
+            const strapGeo = new THREE.TorusGeometry(0.42, 0.05, 8, 16);
+            const strapMat = new THREE.MeshStandardMaterial({ color: 0x1e293b });
+            const strap1 = new THREE.Mesh(strapGeo, strapMat);
+            strap1.rotation.y = Math.PI / 2;
+            strap1.position.set(-0.35, 0.4, 0);
+            itemGroup.add(strap1);
+
+            const strap2 = strap1.clone();
+            strap2.position.set(0.35, 0.4, 0);
+            itemGroup.add(strap2);
+            break;
+          }
+          case 'torch': {
+            // Flash Torch Light Model
+            const bodyGeo = new THREE.CylinderGeometry(0.18, 0.22, 1.1, 12);
+            const bodyMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.7 });
+            const torchBody = new THREE.Mesh(bodyGeo, bodyMat);
+            torchBody.rotation.z = Math.PI / 3;
+            torchBody.position.y = 0.3;
+            torchBody.castShadow = true;
+            itemGroup.add(torchBody);
+
+            // Torch Lens Head
+            const headGeo = new THREE.CylinderGeometry(0.32, 0.22, 0.35, 12);
+            const headMat = new THREE.MeshStandardMaterial({ color: 0xeab308, metalness: 0.8 });
+            const torchHead = new THREE.Mesh(headGeo, headMat);
+            torchHead.rotation.z = Math.PI / 3;
+            torchHead.position.set(-0.35, 0.5, 0);
+            itemGroup.add(torchHead);
+            break;
+          }
+          case 'suncream': {
+            // Sun Cream Bottle Model
+            const bottleGeo = new THREE.BoxGeometry(0.45, 1.1, 0.3);
+            const bottleMat = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.4 });
+            const bottle = new THREE.Mesh(bottleGeo, bottleMat);
+            bottle.position.y = 0.55;
+            bottle.castShadow = true;
+            itemGroup.add(bottle);
+
+            // Cap
+            const capGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.25, 12);
+            const capMat = new THREE.MeshStandardMaterial({ color: 0x0284c7 });
+            const cap = new THREE.Mesh(capGeo, capMat);
+            cap.position.y = 1.15;
+            itemGroup.add(cap);
+            break;
+          }
+          case 'waterbottle': {
+            // Water Bottle Flask Model
+            const flaskGeo = new THREE.CylinderGeometry(0.28, 0.28, 1.1, 16);
+            const flaskMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.4, roughness: 0.3 });
+            const flask = new THREE.Mesh(flaskGeo, flaskMat);
+            flask.position.y = 0.55;
+            flask.castShadow = true;
+            itemGroup.add(flask);
+
+            // Metallic Lid
+            const lidGeo = new THREE.CylinderGeometry(0.16, 0.16, 0.2, 16);
+            const lidMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, metalness: 0.9 });
+            const lid = new THREE.Mesh(lidGeo, lidMat);
+            lid.position.y = 1.15;
+            itemGroup.add(lid);
+            break;
+          }
+        }
+
+        // Add soft pulsing light aura around each item for visibility
+        const itemLight = new THREE.PointLight(0xf59e0b, 1.5, 4.0);
+        itemLight.position.set(0, 0.8, 0);
+        itemGroup.add(itemLight);
+
+        itemGroup.position.set(itemData.pos.x, 0.3, itemData.pos.z);
+        scene.add(itemGroup);
+        itemMeshes.push(itemGroup);
+      });
+    }
+
+    /* Update dynamic interactive labels for real camping items */
+    function checkItemProximity() {
+      let nearestItem = null;
+      let minDistance = 3.5;
+
+      itemMeshes.forEach(itemMesh => {
+        const itemData = itemMesh.userData.data;
+        if (!state.collectedItems.has(itemData.id)) {
+          const dist = player.position.distanceTo(itemMesh.position);
+          if (dist < minDistance) {
+            minDistance = dist;
+            nearestItem = itemData;
+          }
+        }
+      });
+
+      const promptEl = document.getElementById('interaction-prompt');
+      const labelEl = document.getElementById('interact-label');
+
+      if (nearestItem) {
+        state.activeItem = nearestItem;
+        labelEl.textContent = `Pack Item: ${nearestItem.name}`;
+        promptEl.classList.remove('hidden');
+      } else {
+        state.activeItem = null;
+        promptEl.classList.add('hidden');
+      }
+    }
+
+    /* Progressive Lake Water Immersion & Dynamic Drowning */
+    function checkPondImmersionAndDrowning() {
+      const distFromIslandCenter = Math.hypot(player.position.x, player.position.z);
+      const waterOverlay = document.getElementById('water-overlay');
+      
+      let maxDepthFactor = 0;
+
+      // Check outer ocean shore drowning (distance > 38.5)
+      if (distFromIslandCenter > 38.5) {
+        maxDepthFactor = Math.min((distFromIslandCenter - 38.5) / 5.0, 1.0);
+      }
+
+      // Check inner rounded ponds drowning
+      POND_DEFINITIONS.forEach(pond => {
+        const distToPond = Math.hypot(player.position.x - pond.center.x, player.position.z - pond.center.z);
+        if (distToPond < pond.radius) {
+          const depthInPond = (pond.radius - distToPond) / pond.radius;
+          if (depthInPond > maxDepthFactor) {
+            maxDepthFactor = depthInPond;
+          }
+        }
+      });
+
+      state.wadeDepth = maxDepthFactor;
+
+      // Character gradually submerges into the water
+      player.position.y = 1.0 - (maxDepthFactor * 2.2);
+
+      // Tint screen water blue
+      waterOverlay.style.backgroundColor = `rgba(6, 182, 212, ${maxDepthFactor * 0.7})`;
+
+      // Trigger Drowning Respawn Sequence if too deep
+      if (maxDepthFactor >= 0.88 && !state.isRespawning) {
+        triggerDrowningRespawn();
+      }
+    }
+
+    /* Drowning Splash & Safety Respawn Sequence */
+    function triggerDrowningRespawn() {
+      state.isRespawning = true;
+      const waterOverlay = document.getElementById('water-overlay');
+      waterOverlay.style.backgroundColor = `rgba(6, 182, 212, 0.95)`;
+
+      setTimeout(() => {
+        // Reset player to safe campsite center
+        player.position.copy(state.respawnTarget);
+        state.wadeDepth = 0;
+        player.position.y = 1.0;
+        waterOverlay.style.backgroundColor = `rgba(6, 182, 212, 0)`;
+
+        setTimeout(() => {
+          state.isRespawning = false;
+        }, 300);
+      }, 700);
+    }
+
+    /* =========================================================================
+       5. QUIZ MODAL & CONFIRMATION ("ARE YOU SURE?") LOGIC
+       ========================================================================= */
+    function triggerActiveItemInteraction() {
+      if (!state.activeItem || state.isModalOpen) return;
+      openQuizModal(state.activeItem);
+    }
+
+    function openQuizModal(item) {
+      state.isModalOpen = true;
+      state.selectedOptionIndex = null;
+
+      document.getElementById('quiz-item-icon').textContent = item.icon;
+      document.getElementById('quiz-item-title').textContent = `Found: ${item.name}`;
+      document.getElementById('quiz-question-text').textContent = item.question;
+
+      // Render Multiple Choice Options
+      const optionsContainer = document.getElementById('quiz-options-container');
+      optionsContainer.innerHTML = '';
+
+      item.options.forEach((optText, idx) => {
+        const btn = document.createElement('button');
+        btn.className = `w-full text-left p-4 rounded-xl border border-slate-700 bg-slate-800/80 hover:bg-slate-700 hover:border-amber-500/50 transition-all font-semibold text-slate-200 flex items-center justify-between active:scale-[0.99]`;
+        btn.innerHTML = `<span>${optText}</span> <i class="fa-regular fa-circle text-slate-500"></i>`;
+        btn.onclick = () => selectQuizOption(idx, optText);
+        optionsContainer.appendChild(btn);
+      });
+
+      // Reset Modal Views
+      document.getElementById('quiz-question-view').classList.remove('hidden');
+      document.getElementById('quiz-confirm-view').classList.add('hidden');
+      document.getElementById('quiz-feedback').classList.add('hidden');
+
+      document.getElementById('quiz-modal').classList.remove('hidden');
+    }
+
+    function selectQuizOption(index, optionText) {
+      state.selectedOptionIndex = index;
+      document.getElementById('confirm-selected-text').textContent = optionText;
+      
+      // Switch to "Are you sure?" confirmation view
+      document.getElementById('quiz-question-view').classList.add('hidden');
+      document.getElementById('quiz-confirm-view').classList.remove('hidden');
+    }
+
+    // Confirmation "No / Change" Button handler
+    document.getElementById('btn-confirm-no').onclick = () => {
+      document.getElementById('quiz-confirm-view').classList.add('hidden');
+      document.getElementById('quiz-question-view').classList.remove('hidden');
+    };
+
+    // Confirmation "Yes, Submit!" Button handler
+    document.getElementById('btn-confirm-yes').onclick = () => {
+      verifyQuizAnswer();
+    };
+
+    function verifyQuizAnswer() {
+      const item = state.activeItem;
+      const feedbackEl = document.getElementById('quiz-feedback');
+      
+      document.getElementById('quiz-confirm-view').classList.add('hidden');
+      feedbackEl.classList.remove('hidden');
+
+      if (state.selectedOptionIndex === item.correct) {
+        // Correct Answer
+        state.score += 100;
+        state.collectedItems.add(item.id);
+        
+        feedbackEl.className = "p-4 rounded-xl text-center font-bold text-sm mb-4 bg-emerald-500/20 text-emerald-300 border border-emerald-500/40";
+        feedbackEl.innerHTML = `<i class="fa-solid fa-circle-check text-xl mb-1"></i><br>Correct! Item packed into your rucksack!`;
+
+        // Hide Chest from 3D Scene
+        const chestMesh = itemMeshes.find(m => m.userData.id === item.id);
+        if (chestMesh) chestMesh.visible = false;
+
+        updateHUD();
+
+        setTimeout(() => {
+          closeQuizModal();
+          if (state.collectedItems.size === ITEMS_DATA.length) {
+            triggerVictoryCelebration();
+          }
+        }, 1600);
+      } else {
+        // Incorrect Answer
+        feedbackEl.className = "p-4 rounded-xl text-center font-bold text-sm mb-4 bg-rose-500/20 text-rose-300 border border-rose-500/40";
+        feedbackEl.innerHTML = `<i class="fa-solid fa-circle-xmark text-xl mb-1"></i><br>Oops! Try reading the question again.`;
+
+        setTimeout(() => {
+          feedbackEl.classList.add('hidden');
+          document.getElementById('quiz-question-view').classList.remove('hidden');
+        }, 1800);
+      }
+    }
+
+    function closeQuizModal() {
+      document.getElementById('quiz-modal').classList.add('hidden');
+      state.isModalOpen = false;
+    }
+
+    /* Update Dynamic HUD Stats & Icons */
+    function updateHUD() {
+      document.getElementById('hud-progress').textContent = `${state.collectedItems.size} / ${ITEMS_DATA.length}`;
+      document.getElementById('hud-score').textContent = state.score;
+
+      // Update Inventory Drawer Icons
+      const drawer = document.getElementById('inventory-list');
+      drawer.innerHTML = '';
+      ITEMS_DATA.forEach(item => {
+        const isPacked = state.collectedItems.has(item.id);
+        const itemBox = document.createElement('div');
+        itemBox.className = `w-12 h-12 rounded-xl border flex flex-col items-center justify-center text-lg transition-all ${
+          isPacked ? 'bg-amber-500/20 border-amber-400 text-amber-300 shadow-md scale-105' : 'bg-slate-800/60 border-slate-700 text-slate-600 opacity-60'
+        }`;
+        itemBox.innerHTML = `<span>${item.icon}</span>`;
+        drawer.appendChild(itemBox);
+      });
+    }
+
+    /* Trigger Victory Modal with Confetti Celebration */
+    function triggerVictoryCelebration() {
+      state.gameEnded = true;
+      document.getElementById('victory-score').textContent = `${state.score} Pts`;
+      document.getElementById('victory-modal').classList.remove('hidden');
+
+      // Launch Confetti Cannon
+      if (typeof confetti === 'function') {
+        confetti({
+          particleCount: 120,
+          spread: 80,
+          origin: { y: 0.6 }
+        });
+      }
+    }
+
+    /* =========================================================================
+       6. UI BUTTON HANDLERS & HELPERS
+       ========================================================================= */
+    document.getElementById('interact-btn').onclick = triggerActiveItemInteraction;
+
+    // Scan Island Button (360 Sweep)
+    document.getElementById('btn-scan').onclick = () => {
+      state.isSweepingCamera = true;
+    };
+
+    // Controls Modal Button Toggle
+    document.getElementById('btn-controls').onclick = () => {
+      document.getElementById('controls-modal').classList.remove('hidden');
+      state.isModalOpen = true;
+    };
+
+    document.getElementById('close-controls-btn').onclick = () => {
+      document.getElementById('controls-modal').classList.add('hidden');
+      state.isModalOpen = false;
+    };
+
+    document.getElementById('got-it-btn').onclick = () => {
+      document.getElementById('controls-modal').classList.add('hidden');
+      state.isModalOpen = false;
+    };
+
+    // Restart Game
+    document.getElementById('btn-restart').onclick = () => {
+      location.reload();
+    };
+
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    /* =========================================================================
+       7. MAIN ANIMATION LOOP
+       ========================================================================= */
+    let clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = clock.getDelta();
+
+      updatePlayerAndCamera(delta);
+      renderer.render(scene, camera);
+    }
+
+    /* Run Game on Window Load */
+    window.onload = function() {
+      init3D();
+      setupInputListeners();
+      updateHUD();
+      animate();
+    };
+  </script>
+</body>
+</html>
